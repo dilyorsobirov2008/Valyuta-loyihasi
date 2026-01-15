@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from datetime import datetime
 import aiohttp
 from aiogram import Bot, Dispatcher, types
@@ -8,7 +9,7 @@ from aiogram.filters import ChatMemberUpdatedFilter, JOIN_TRANSITION
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # --- SOZLAMALAR ---
-# Token va ID-ni shu yerga to'g'ridan-to'g'ri yozing
+# Token va ID-ni to'g'ridan-to'g'ri joylashtirdim
 TOKEN = "8588087982:AAGpoXDGFhwrDGKLZ8WYJQXvlMMO8E7M8b8"
 CHANNEL_ID = "-1003346733347"
 
@@ -29,7 +30,7 @@ async def get_exchange_rates():
                     rates = {item['Ccy']: item['Rate'] for item in data if item['Ccy'] in ['USD', 'EUR', 'RUB']}
                     return rates
     except Exception as e:
-        logging.error(f"API xatoligi yuz berdi: {e}")
+        logging.error(f"API xatoligi: {e}")
     return None
 
 # --- XABAR MATNINI TAYYORLASH ---
@@ -42,46 +43,46 @@ async def prepare_currency_text():
             f"💵 <b>USD:</b> {rates.get('USD')} so‘m\n"
             f"💶 <b>EUR:</b> {rates.get('EUR')} so‘m\n"
             f"🇷🇺 <b>RUB:</b> {rates.get('RUB')} so‘m\n\n"
-            f"⏰ <b>Yangilangan vaqt:</b> {current_time}"
+            f"⏰ <b>Sana:</b> {current_time}"
         )
         return text
-    return "⚠️ Valyuta kurslarini olishda xatolik yuz berdi."
+    return "⚠️ Kurslarni yuklashda muammo bo'ldi."
 
-# --- KANALGA XABAR YUBORISH (SCHEDULER UCHUN) ---
+# --- KANALGA YUBORISH (KUNLIK) ---
 async def send_daily_report():
     text = await prepare_currency_text()
     try:
         await bot.send_message(chat_id=CHANNEL_ID, text=text, parse_mode=ParseMode.HTML)
-        logging.info("Kunlik kurs kanalga yuborildi.")
+        logging.info("Kunlik hisobot yuborildi.")
     except Exception as e:
-        logging.error(f"Kanalga yuborishda xato: {e}")
+        logging.error(f"Xatolik: {e}")
 
-# --- YANGI A'ZO QO'SHILGANDA ISHLAYDIGAN QISM ---
+# --- YANGI A'ZO KIRGANDA YUBORISH ---
 @dp.chat_member(ChatMemberUpdatedFilter(JOIN_TRANSITION))
 async def on_user_join(event: types.ChatMemberUpdated):
-    # Faqat belgilangan kanalda ishlaydi
     if str(event.chat.id) == str(CHANNEL_ID):
         text = await prepare_currency_text()
-        welcome_msg = f"🌟 <b>Xush kelibsiz!</b>\n\n{text}"
         try:
-            await bot.send_message(chat_id=CHANNEL_ID, text=welcome_msg, parse_mode=ParseMode.HTML)
-            logging.info(f"Yangi foydalanuvchi kirdi, kurs yuborildi.")
+            await bot.send_message(
+                chat_id=CHANNEL_ID, 
+                text=f"🌟 <b>Yangi a'zo qo'shildi!</b>\n\n{text}", 
+                parse_mode=ParseMode.HTML
+            )
+            logging.info("Yangi a'zoga kurs yuborildi.")
         except Exception as e:
-            logging.error(f"Xabar yuborishda xato: {e}")
+            logging.error(f"Xatolik: {e}")
 
-# --- ASOSIY FUNKSIYA ---
+# --- ASOSIY ISHGA TUSHIRISH ---
 async def main():
-    # Vaqtni rejalashtiruvchi (Toshkent vaqti bilan)
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
     
     # Har kuni soat 09:00 da avtomatik yuborish
     scheduler.add_job(send_daily_report, "cron", hour=9, minute=0)
     scheduler.start()
 
-    logging.info("Bot ishga tushdi. Reja: Har kuni 09:00da va yangi a'zo kirganda.")
+    logging.info("Bot ishga tushdi...")
     
     try:
-        # Botni ishga tushirish
         await dp.start_polling(bot)
     finally:
         await bot.session.close()
